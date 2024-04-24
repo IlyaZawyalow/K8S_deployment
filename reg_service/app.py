@@ -109,6 +109,38 @@ def show_index():
 def show_register_form():
     return render_template('register.html')
 
+
+@app.route('/show_users', methods=['GET'])
+def show_users():
+    try:
+        # Получаем параметры подключения к базе данных из ConfigMap
+        db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
+
+        # Устанавливаем соединение с базой данных PostgreSQL
+        with psycopg2.connect(
+            host=db_host,
+            port=db_port,
+            dbname=db_name,
+            user=db_user,
+            password=db_password
+        ) as conn:
+            # Создаем курсор для выполнения SQL запросов
+            with conn.cursor() as cursor:
+                # Выполняем SQL запрос для выборки всех записей из таблицы "users"
+                cursor.execute("SELECT id, name, email FROM users")
+                rows = cursor.fetchall()  # Получаем все строки результата
+
+                # Формируем список пользователей для передачи в шаблон
+                users = [{'id': row[0], 'name': row[1], 'email': row[2]} for row in rows]
+
+        # Отображаем страницу с результатами (список пользователей)
+        return render_template('users.html', users=users)
+
+    except Exception as e:
+        return render_template('error.html', error=str(e))
+    
+
+
 # Маршрут для обработки регистрации пользователя
 @app.route('/register', methods=['POST'])
 def register_user():
