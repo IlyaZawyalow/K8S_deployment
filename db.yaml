@@ -34,7 +34,7 @@ metadata:
   name: postgresql-db
 spec:
   serviceName: postgres-db-lb  # Было "postgresql-db-service", исправил на "postgres-db-lb"
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: postgresql-db

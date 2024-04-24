@@ -1,7 +1,8 @@
+import psycopg2
 from flask import Flask, request, jsonify, render_template
 from kubernetes import client, config
-import psycopg2
 from loguru import logger
+from psycopg2 import IntegrityError
 
 app = Flask(__name__)
 
@@ -44,32 +45,24 @@ def create_users_table_if_not_exists():
         db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
 
         # Устанавливаем соединение с базой данных PostgreSQL
-        conn = psycopg2.connect(
+        with psycopg2.connect(
             host=db_host,
             port=db_port,
             dbname=db_name,
             user=db_user,
             password=db_password
-        )
-
-        # Создаем курсор для выполнения SQL запросов
-        cursor = conn.cursor()
-
-        # Выполняем SQL запрос для создания таблицы "users", если она не существует
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id SERIAL PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                email VARCHAR(100) NOT NULL
-            )
-        """)
-
-        # Фиксируем изменения в базе данных
-        conn.commit()
-
-        # Закрываем курсор и соединение
-        cursor.close()
-        conn.close()
+        ) as conn:
+            # Создаем курсор для выполнения SQL запросов
+            with conn.cursor() as cursor:
+                # Выполняем SQL запрос для создания таблицы "users", если она не существует
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id SERIAL PRIMARY KEY,
+                        name VARCHAR(100) UNIQUE NOT NULL,
+                        email VARCHAR(100) UNIQUE NOT NULL
+                    )
+                """)
+                logger.info("Выполнили SQL запрос для создания таблицы 'users', если она не существует")
 
     except Exception as e:
         logger.error(f"Error creating 'users' table: {str(e)}")
@@ -83,36 +76,30 @@ def create_user_in_db(name, email):
         # Получаем параметры подключения к базе данных из ConfigMap
         db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
 
-        if not all([db_host, db_port, db_name, db_user, db_password]):
-            raise Exception("Failed to retrieve DB connection parameters from ConfigMap")
-
         # Устанавливаем соединение с базой данных PostgreSQL
-        conn = psycopg2.connect(
+        with psycopg2.connect(
             host=db_host,
             port=db_port,
             dbname=db_name,
             user=db_user,
             password=db_password
-        )
+        ) as conn:
+            # Создаем курсор для выполнения SQL запросов
+            with conn.cursor() as cursor:
+                # Выполняем SQL запрос для создания новой записи о пользователе
+                cursor.execute("INSERT INTO users (name, email) VALUES (%s, %s)", (name, email))
 
-        # Создаем курсор для выполнения SQL запросов
-        cursor = conn.cursor()
+                # Фиксируем изменения в базе данных
+                conn.commit()
+                return True
 
-        # Выполняем SQL запрос для добавления новой записи о пользователе
-        cursor.execute("INSERT INTO users (name, email) VALUES (%s, %s)", (name, email))
+    except IntegrityError:
+        logger.warning('Integrity error occurred. User with the same name or email already exists.')
+        return False  # Возвращаем False, чтобы показать, что операция не удалась из-за дубликата
+    except Exception as err:
+        logger.error(f'Error executing query: {err}')
 
-        # Фиксируем изменения в базе данных
-        conn.commit()
-
-        # Закрываем курсор и соединение
-        cursor.close()
-        conn.close()
-
-        return True
-
-    except Exception as e:
-        logger.error(f"Failed to add user to database: {str(e)}")
-        return False
+    return False
 
 # Маршрут для отображения главной страницы
 @app.route('/', methods=['GET'])
