@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: flask-app
-          image: ilyazawyalowww/reg_service:v8
+          image: ilyazawyalowww/reg_service:v9
           ports:
             - containerPort: 5000
 

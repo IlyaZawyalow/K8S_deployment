@@ -86,20 +86,18 @@ def create_user_in_db(name, email):
         ) as conn:
             # Создаем курсор для выполнения SQL запросов
             with conn.cursor() as cursor:
-                # Выполняем SQL запрос для создания новой записи о пользователе
+                # Пытаемся добавить нового пользователя
                 cursor.execute("INSERT INTO users (name, email) VALUES (%s, %s)", (name, email))
-
-                # Фиксируем изменения в базе данных
-                conn.commit()
+                conn.commit()  # Фиксируем изменения в базе данных
                 return True
 
-    except IntegrityError:
-        logger.warning('Integrity error occurred. User with the same name or email already exists.')
-        return False  # Возвращаем False, чтобы показать, что операция не удалась из-за дубликата
-    except Exception as err:
-        logger.error(f'Error executing query: {err}')
-
-    return False
+    except IntegrityError as e:
+        # Если возникло исключение IntegrityError, значит пользователь уже существует
+        logger.warning(f'User with the same name or email already exists: {e}')
+        return False
+    except Exception as e:
+        logger.error(f'Error executing query: {e}')
+        return False
 
 # Маршрут для отображения главной страницы
 @app.route('/', methods=['GET'])
@@ -123,11 +121,11 @@ def register_user():
         if not name or not email:
             raise Exception("Name and email are required for registration")
 
-        # Создаем новую запись о пользователе в базе данных
+        # Пытаемся создать нового пользователя
         if create_user_in_db(name, email):
             return render_template('register.html', message='User registered successfully')
         else:
-            return render_template('error.html', error='Failed to register user')
+            return render_template('register.html', message='User already exists')
 
     except Exception as e:
         return render_template('error.html', error=str(e))
