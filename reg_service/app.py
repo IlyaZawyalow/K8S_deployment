@@ -3,8 +3,6 @@ from flask import Flask, request, jsonify, render_template
 from kubernetes import client, config
 from loguru import logger
 from psycopg2 import IntegrityError
-import os
-
 
 app = Flask(__name__)
 
@@ -12,23 +10,21 @@ app = Flask(__name__)
 # Функция для получения параметров подключения к базе данных из ConfigMap
 def get_db_connection_params_from_configmap():
     try:
-        # Инициализация клиента Kubernetes из текущего контекста
+
         config.load_incluster_config()  # Используем, если запущено внутри Kubernetes
 
-        # Создаем объект API клиента для работы с ConfigMap
         v1 = client.CoreV1Api()
 
         # Название ConfigMap с параметрами подключения
         config_map_name = "postgres-db-config"
 
-        # Получаем данные ConfigMap из текущего namespace
         config_map = v1.read_namespaced_config_map(config_map_name, namespace="default")
         # Извлекаем параметры подключения из данных ConfigMap
         db_host = config_map.data.get('DB_HOST', 'postgres-db-lb.default.svc.cluster.local')
         db_port = config_map.data.get('DB_PORT', '5432')
         db_name = config_map.data.get('DB_NAME', 'postgres')
         db_user = config_map.data.get('DB_USER', 'postgres')
-        db_password = config_map.data.get('DB_PASSWORD', 'test123')
+        db_password = config_map.data.get('DB_PASSWORD', 'test123')       
         return db_host, db_port, db_name, db_user, db_password
 
     except Exception as e:
@@ -59,6 +55,7 @@ def create_users_table_if_not_exists():
                         email VARCHAR(100) UNIQUE NOT NULL
                     )
                 """)
+
     except Exception as e:
         logger.error(f"Error creating 'users' table: {str(e)}")
 
@@ -94,31 +91,10 @@ def create_user_in_db(name, email):
         logger.error(f'Error executing query: {e}')
         return False
 
+# Маршрут для отображения главной страницы
 @app.route('/', methods=['GET'])
 def show_index():
-    try:
-        # Получаем IP-адрес текущего пода Kubernetes
-        pod_ip = get_pod_ip()
-    except Exception as e:
-        # Если не удалось получить IP-адрес, используем заглушку
-        pod_ip = "Unknown"
-
-    return render_template('index.html', pod_ip=pod_ip)
-
-# Функция для получения IP-адреса текущего пода Kubernetes
-def get_pod_ip():
-    # Инициализируем клиент Kubernetes из текущего контекста
-    logger.info("Инициализируем клиент Kubernetes из текущего контекста")
-    config.load_incluster_config()
-    logger.info("Получаем IP-адрес текущего пода")
-    # Получаем IP-адрес текущего пода
-    v1 = client.CoreV1Api()
-    logger.info("создали экземпляр класса")
-    pod_name = os.environ.get('HOSTNAME')
-    logger.info(f"имя пода: {pod_name}")
-    pod_info = v1.read_namespaced_pod(name=pod_name, namespace="default")
-    logger.info(f"pod_info: {pod_info}")
-    return pod_info.status.pod_ip
+    return render_template('index.html')
 
 # Маршрут для отображения формы регистрации
 @app.route('/register', methods=['GET'])
