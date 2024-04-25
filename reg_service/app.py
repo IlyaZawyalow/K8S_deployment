@@ -6,6 +6,7 @@ from psycopg2 import IntegrityError
 
 app = Flask(__name__)
 
+
 # Функция для получения параметров подключения к базе данных из ConfigMap
 def get_db_connection_params_from_configmap():
     try:
