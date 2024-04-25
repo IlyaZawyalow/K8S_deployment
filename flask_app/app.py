@@ -7,15 +7,14 @@ from psycopg2 import IntegrityError
 app = Flask(__name__)
 
 
-# Функция для получения параметров подключения к базе данных из ConfigMap
+
 def get_db_connection_params_from_configmap():
+    """
+    Функция для получения параметров подключения к базе данных из ConfigMap
+    """
     try:
-
-        config.load_incluster_config()  # Используем, если запущено внутри Kubernetes
-
+        config.load_incluster_config()
         v1 = client.CoreV1Api()
-
-        # Название ConfigMap с параметрами подключения
         config_map_name = "postgres-db-config"
 
         config_map = v1.read_namespaced_config_map(config_map_name, namespace="default")
@@ -31,13 +30,14 @@ def get_db_connection_params_from_configmap():
         logger.error(f"Error retrieving DB connection parameters from ConfigMap: {str(e)}")
         return None
 
-# Функция для создания таблицы "users", если она не существует
 def create_users_table_if_not_exists():
+    """
+    Функция для создания таблицы "users", если она не существует
+    """
     try:
         # Получаем параметры подключения к базе данных из ConfigMap
         db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
 
-        # Устанавливаем соединение с базой данных PostgreSQL
         with psycopg2.connect(
             host=db_host,
             port=db_port,
@@ -45,9 +45,7 @@ def create_users_table_if_not_exists():
             user=db_user,
             password=db_password
         ) as conn:
-            # Создаем курсор для выполнения SQL запросов
             with conn.cursor() as cursor:
-                # Выполняем SQL запрос для создания таблицы "users", если она не существует
                 cursor.execute("""
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
@@ -59,16 +57,16 @@ def create_users_table_if_not_exists():
     except Exception as e:
         logger.error(f"Error creating 'users' table: {str(e)}")
 
-# Функция для создания новой записи о пользователе в базе данных
 def create_user_in_db(name, email):
+    """
+    Функция для создания новой записи о пользователе в базе данных
+    """
     try:
-        # Создаем таблицу "users", если она не существует
         create_users_table_if_not_exists()
 
         # Получаем параметры подключения к базе данных из ConfigMap
         db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
 
-        # Устанавливаем соединение с базой данных PostgreSQL
         with psycopg2.connect(
             host=db_host,
             port=db_port,
@@ -76,27 +74,22 @@ def create_user_in_db(name, email):
             user=db_user,
             password=db_password
         ) as conn:
-            # Создаем курсор для выполнения SQL запросов
             with conn.cursor() as cursor:
-                # Пытаемся добавить нового пользователя
                 cursor.execute("INSERT INTO users (name, email) VALUES (%s, %s)", (name, email))
-                conn.commit()  # Фиксируем изменения в базе данных
+                conn.commit()
                 return True
-
     except IntegrityError as e:
-        # Если возникло исключение IntegrityError, значит пользователь уже существует
         logger.warning(f'User with the same name or email already exists: {e}')
         return False
     except Exception as e:
         logger.error(f'Error executing query: {e}')
         return False
 
-# Маршрут для отображения главной страницы
 @app.route('/', methods=['GET'])
 def show_index():
     return render_template('index.html')
 
-# Маршрут для отображения формы регистрации
+
 @app.route('/register', methods=['GET'])
 def show_register_form():
     return render_template('register.html')
@@ -108,7 +101,6 @@ def show_users():
         # Получаем параметры подключения к базе данных из ConfigMap
         db_host, db_port, db_name, db_user, db_password = get_db_connection_params_from_configmap()
 
-        # Устанавливаем соединение с базой данных PostgreSQL
         with psycopg2.connect(
             host=db_host,
             port=db_port,
@@ -116,24 +108,18 @@ def show_users():
             user=db_user,
             password=db_password
         ) as conn:
-            # Создаем курсор для выполнения SQL запросов
             with conn.cursor() as cursor:
-                # Выполняем SQL запрос для выборки всех записей из таблицы "users"
                 cursor.execute("SELECT id, name, email FROM users")
-                rows = cursor.fetchall()  # Получаем все строки результата
+                rows = cursor.fetchall()
 
                 # Формируем список пользователей для передачи в шаблон
                 users = [{'id': row[0], 'name': row[1], 'email': row[2]} for row in rows]
-
-        # Отображаем страницу с результатами (список пользователей)
         return render_template('users.html', users=users)
 
     except Exception as e:
         return render_template('error.html', error=str(e))
     
 
-
-# Маршрут для обработки регистрации пользователя
 @app.route('/register', methods=['POST'])
 def register_user():
     try:
