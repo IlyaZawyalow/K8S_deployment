@@ -1,6 +1,5 @@
 import psycopg2
-from flask import Flask, request, jsonify, render_template
-from kubernetes import client, config
+from flask import Flask, request, render_template
 from loguru import logger
 from psycopg2 import IntegrityError
 import os
