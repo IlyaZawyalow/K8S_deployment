@@ -3,9 +3,10 @@ from flask import Flask, request, jsonify, render_template
 from kubernetes import client, config
 from loguru import logger
 from psycopg2 import IntegrityError
+import os
+
 
 app = Flask(__name__)
-
 
 
 def get_db_connection_params_from_configmap():
@@ -13,17 +14,11 @@ def get_db_connection_params_from_configmap():
     Функция для получения параметров подключения к базе данных из ConfigMap
     """
     try:
-        config.load_incluster_config()
-        v1 = client.CoreV1Api()
-        config_map_name = "postgres-db-config"
-
-        config_map = v1.read_namespaced_config_map(config_map_name, namespace="default")
-        # Извлекаем параметры подключения из данных ConfigMap
-        db_host = config_map.data.get('DB_HOST', 'postgres-db-lb.default.svc.cluster.local')
-        db_port = config_map.data.get('DB_PORT', '5432')
-        db_name = config_map.data.get('DB_NAME', 'postgres')
-        db_user = config_map.data.get('DB_USER', 'postgres')
-        db_password = config_map.data.get('DB_PASSWORD', 'test123')       
+        db_password = os.environ.get('POSTGRES_PASSWORD')
+        db_host = os.environ.get('DB_HOST')
+        db_port = os.environ.get('DB_PORT')
+        db_name = os.environ.get('DB_NAME')
+        db_user = os.environ.get('DB_USER')       
         return db_host, db_port, db_name, db_user, db_password
 
     except Exception as e:
